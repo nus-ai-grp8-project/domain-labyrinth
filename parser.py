@@ -8,60 +8,63 @@ DIRECTION = {
     'W' : (1, 0)
 }
 
-# Sample PDDL content
-def read_pddl_file(filename=""):
-    content = None
-    with open(file=filename) as f:
-        content = f.read()
-    print(content)
-    return content
+class Parser:
 
-
-def extract_blocked_statements(pddl):
-    # Regex pattern to match BLOCKED statements
-    pattern = re.compile(r'\(BLOCKED (\w+) (\w+)\)')
+    def __read_filename(self, filename, verbose=False):
+        content = None
+        with open(file=filename) as f:
+            content = f.read()
+        print(content) if verbose else None
+        return content
     
-    # Find all matches in the PDDL content
-    blocked_statements = pattern.findall(pddl)
+    def __extract_blocked_statements(self, pddl_content, verbose=False):
+        # Regex pattern to match BLOCKED statements
+        pattern = re.compile(r'\(BLOCKED (\w+) (\w+)\)')
+        
+        # Find all matches in the PDDL content
+        blocked_statements = pattern.findall(pddl_content)
+        
+        tile_config = dict()
+        # Collect each blocked statement
+        for card, direction in blocked_statements:
+            if card[4:] not in tile_config.keys():
+                tile_config[card[4:]] = [direction]
+            else:
+                tile_config[card[4:]].append(direction)
+        print(tile_config) if verbose else None
+        return tile_config
     
-    tile_config = dict()
-    # Collect each blocked statement
-    for card, direction in blocked_statements:
-        if card[4:] not in tile_config.keys():
-            tile_config[card[4:]] = [direction]
-        else:
-            tile_config[card[4:]].append(direction)
-    print(tile_config)
-    return tile_config
+    def __generate_board(self, N, tile_config:dict):
+        block_collections = []
 
-# Extract and print blocked statements
-pddl_content = read_pddl_file("3x3_instances_pddl/instance_0_3_by_3.pddl")
-tile_config = extract_blocked_statements(pddl_content)
-N = np.sqrt(len(tile_config)).astype(int)
+        for _ , blocks in tile_config.items():
+            initial_tile = np.ones((N, N))
+            # All 4 corners are assumed block
+            initial_tile[0, 0] = 0
+            initial_tile[0, 2] = 0
+            initial_tile[2, 0] = 0
+            initial_tile[2, 2] = 0
 
-block_collections = []
+            # Block those specified
+            for direction in blocks:
+                initial_tile[DIRECTION[direction]] = 0
+            block_collections.append(initial_tile)
+        result = np.block([[block_collections[i * N + j] for j in range(N)] for i in range(N)])
+        print(f"******** GENERATING BOARD ********")
+        print(result)
+        return result
 
-for card , blocks in tile_config.items():
-    initial_tile = np.ones((N, N))
-    print(f"Card {card}:\n")
-    # All 4 corners are assumed block
-    initial_tile[0, 0] = 0
-    initial_tile[0, 2] = 0
-    initial_tile[2, 0] = 0
-    initial_tile[2, 2] = 0
+    def get_board(self, filename: str | None, verbose=False):
+        pddl_content = self.__read_filename(filename, verbose=verbose)
+        tile_configs = self.__extract_blocked_statements(pddl_content=pddl_content, verbose=False)
+        N = np.sqrt(len(tile_configs)).astype(int)
+        return self.__generate_board(N, tile_config=tile_configs)
+    
+if __name__ == "__main__":
+    parser = Parser()
+    parser.get_board(filename="5x5_instances_pddl/instance_2_5_by_5.pddl")
 
-    # Block those specified
-    for direction in blocks:
-        initial_tile[DIRECTION[direction]] = 0
-    block_collections.append(initial_tile)
-    print(initial_tile)
-    print('\n')
-
-result = np.block([[block_collections[i * N + j] for j in range(N)] for i in range(N)])
-
-print(f"Resulting Board Config : \n")
-
-print(result)
+        
 
 
 
